@@ -5,7 +5,13 @@ use std::{
 };
 
 fn main() -> io::Result<()> {
-    let file = File::open("input.txt").expect("file not found");
+    let start = std::time::Instant::now();
+
+    // Read filename from command line arguments:
+    let args: Vec<String> = std::env::args().collect();
+    let filename = &args.get(1).expect("no filename provided");
+
+    let file = File::open(filename).expect("file not found");
     let reader = BufReader::new(file);
 
     // u32::MAX is 4.29B so it should be enough for 1BRC
@@ -14,8 +20,14 @@ fn main() -> io::Result<()> {
     let mut max_map: HashMap<String, f32> = HashMap::new();
     let mut min_map: HashMap<String, f32> = HashMap::new();
 
+    let mut lines_processed = 0;
+
     for line in reader.lines() {
         let line = line.expect("cannot read line");
+        if line.starts_with('#') {
+            continue;
+        }
+
         let mut splitted_line = line.split(';');
 
         let station = splitted_line.next().unwrap().to_string();
@@ -38,6 +50,8 @@ fn main() -> io::Result<()> {
         *current_sum += number;
         *current_count += 1;
 
+        lines_processed += 1;
+
         // println!("station: {}, number: {}", station, number);
     }
 
@@ -46,6 +60,12 @@ fn main() -> io::Result<()> {
         let max = max_map.get(&station).unwrap();
         println!("{};{};{};{}", station, min, (sum / (count as f32)), max);
     }
+
+    println!(
+        "Processed {} lines in {} ms",
+        lines_processed,
+        start.elapsed().as_millis()
+    );
 
     Ok(())
 }
