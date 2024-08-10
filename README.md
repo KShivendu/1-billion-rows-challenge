@@ -16,3 +16,11 @@ wget https://raw.githubusercontent.com/gunnarmorling/1brc/main/data/weather_stat
 # Run the program
 cargo run data/weather_stations.csv
 ```
+
+<!--
+
+* Naive implementation perf:
+    Processed 44691 lines in 835 ms
+    Expected seconds for 1 billion rows instead 18696.61464276924 (5.2hours)
+
+-->

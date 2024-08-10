@@ -61,10 +61,17 @@ fn main() -> io::Result<()> {
         println!("{};{};{};{}", station, min, (sum / (count as f32)), max);
     }
 
+    let duration = start.elapsed();
+
     println!(
         "Processed {} lines in {} ms",
         lines_processed,
-        start.elapsed().as_millis()
+        duration.as_millis()
+    );
+
+    println!(
+        "Expected seconds for 1 billion rows instead {}",
+        (duration.as_secs_f64() / lines_processed as f64) * 1_000_000_000_f64
     );
 
     Ok(())
