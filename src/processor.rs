@@ -6,7 +6,14 @@ use std::{
 };
 
 pub fn process_data(input_filename: &str, output_filename: &str) -> Result<u32, io::Error> {
-    let input_file = File::open(input_filename).expect("file not found");
+    let input_file = File::open(input_filename).unwrap_or_else(|_| {
+        let pwd = std::env::current_dir().expect("cannot get current directory");
+        panic!(
+            "cannot open input file {}. pwd: {}",
+            input_filename,
+            pwd.to_str().unwrap()
+        )
+    });
     let reader = BufReader::new(input_file);
 
     let output_file = File::create(output_filename).expect("cannot create output file");

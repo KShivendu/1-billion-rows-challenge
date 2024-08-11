@@ -13,3 +13,7 @@ criterion = "0.5.1"
 [[bench]]
 name = "demo_bench"
 harness = false
+
+[profile.perf]
+inherits = "release"
+debug = true

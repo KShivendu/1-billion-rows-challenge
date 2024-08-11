@@ -17,6 +17,21 @@ wget https://raw.githubusercontent.com/gunnarmorling/1brc/main/data/weather_stat
 cargo run data/weather_stations.csv
 ```
 
+### Perf analysis:
+
+```bash
+cargo install flamegraph
+echo -1 | sudo tee /proc/sys/kernel/perf_event_paranoid
+echo 0 | sudo tee /proc/sys/kernel/kptr_restrict
+
+# perf stats:
+perf stat ./target/perf/one_brc data/weather_stations.csv
+
+# More:
+perf record -g cargo run --profile perf data/weather_stations.csv
+perf report -g
+```
+
 ## Iterations
 
 * Naive implementation perf:
