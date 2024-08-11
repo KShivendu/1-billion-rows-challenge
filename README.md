@@ -17,6 +17,8 @@ wget https://raw.githubusercontent.com/gunnarmorling/1brc/main/data/weather_stat
 cargo run data/weather_stations.csv
 ```
 
+## Iterations
+
 * Naive implementation perf:
     ```
     Processed 44691 lines in 835 ms
