@@ -1,3 +1,5 @@
+use std::io::{BufWriter, Write};
+use std::path;
 use std::{
     collections::HashMap,
     fs::File,
@@ -13,6 +15,12 @@ fn main() -> io::Result<()> {
 
     let file = File::open(filename).expect("file not found");
     let reader = BufReader::new(file);
+
+    let input_parent = path::Path::new(filename).parent().unwrap();
+    let output_filename = input_parent.join("output.csv");
+
+    let output_file = File::create(output_filename).expect("cannot create output file");
+    let mut writer = BufWriter::new(output_file);
 
     // u32::MAX is 4.29B so it should be enough for 1BRC
 
@@ -58,7 +66,10 @@ fn main() -> io::Result<()> {
     for (station, (sum, count)) in sum_and_count_map.into_iter() {
         let min = min_map.get(&station).unwrap();
         let max = max_map.get(&station).unwrap();
-        println!("{};{};{};{}", station, min, (sum / (count as f32)), max);
+        // println!("{};{};{};{}", station, min, (sum / (count as f32)), max);
+        writer.write_all(
+            format!("{};{};{};{}\n", station, min, (sum / (count as f32)), max).as_bytes(),
+        )?;
     }
 
     let duration = start.elapsed();
