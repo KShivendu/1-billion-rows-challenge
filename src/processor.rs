@@ -5,6 +5,25 @@ use std::{
     io::{self, BufRead, BufReader},
 };
 
+// u32::MAX is 4.29B so u32 should be enough for 1 billion
+struct Stats {
+    sum: f32,
+    count: u32,
+    min: f32,
+    max: f32,
+}
+
+impl Stats {
+    fn new() -> Self {
+        Self {
+            sum: 0.0,
+            count: 0,
+            min: f32::MAX,
+            max: f32::MIN,
+        }
+    }
+}
+
 pub fn process_data(input_filename: &str, output_filename: &str) -> Result<u32, io::Error> {
     let input_file = File::open(input_filename).unwrap_or_else(|_| {
         let pwd = std::env::current_dir().expect("cannot get current directory");
@@ -19,11 +38,7 @@ pub fn process_data(input_filename: &str, output_filename: &str) -> Result<u32, 
     let output_file = File::create(output_filename).expect("cannot create output file");
     let mut writer = BufWriter::new(output_file);
 
-    // u32::MAX is 4.29B so it should be enough for 1BRC
-
-    let mut sum_and_count_map: HashMap<String, (f32, u32)> = HashMap::new();
-    let mut max_map: HashMap<String, f32> = HashMap::new();
-    let mut min_map: HashMap<String, f32> = HashMap::new();
+    let mut stats_map: HashMap<String, Stats> = HashMap::new();
 
     let mut lines_processed: u32 = 0;
 
@@ -38,34 +53,35 @@ pub fn process_data(input_filename: &str, output_filename: &str) -> Result<u32, 
         let station = splitted_line.next().unwrap().to_string();
         let number = splitted_line.next().unwrap().parse::<f32>().unwrap();
 
-        let current_min = min_map.entry(station.clone()).or_insert(number);
-        if number < *current_min {
-            *current_min = number;
+        let current_stats = stats_map.entry(station).or_insert(Stats::new());
+
+        if number < current_stats.min {
+            current_stats.min = number;
         }
 
-        let current_max = max_map.entry(station.clone()).or_insert(number);
-        if number > *current_max {
-            *current_max = number;
+        if number > current_stats.max {
+            current_stats.max = number;
         }
 
-        let (current_sum, current_count) = sum_and_count_map
-            .entry(station.clone())
-            .or_insert((number, 1));
-
-        *current_sum += number;
-        *current_count += 1;
+        current_stats.sum += number;
+        current_stats.count += 1;
 
         lines_processed += 1;
 
         // println!("station: {}, number: {}", station, number);
     }
 
-    for (station, (sum, count)) in sum_and_count_map.into_iter() {
-        let min = min_map.get(&station).unwrap();
-        let max = max_map.get(&station).unwrap();
+    for (station, stats) in stats_map.into_iter() {
         // println!("{};{};{};{}", station, min, (sum / (count as f32)), max);
         writer.write_all(
-            format!("{};{};{};{}\n", station, min, (sum / (count as f32)), max).as_bytes(),
+            format!(
+                "{};{};{};{}\n",
+                station,
+                stats.min,
+                (stats.sum / (stats.count as f32)),
+                stats.max
+            )
+            .as_bytes(),
         )?;
     }
 

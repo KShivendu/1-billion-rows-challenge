@@ -44,10 +44,26 @@ perf report -g
     ```
     Processed 44691 lines in 197 ms
     Expected seconds for 1 billion rows instead 4408.8128706003445 (1.2hours)
+    # Improvement: 835 / 197 = 4.2X
     ```
 
 * Use release build instead of debug:
     ```
     Processed 44691 lines in 71 ms
     Expected seconds for 1 billion rows instead 1593.0595198138326 (27mins)
+    # Improvement: 197 / 71 = 2.77X
     ```
+
+* Use 1 hashmap (with struct) instead of 3
+    ```bash
+    # My machine's perf degradaded a bit so absolute perf went down. But relative improvement can be seen
+
+    # Before:
+    Processed 44691 lines in 119 ms
+    Expected seconds for 1 billion rows instead 2676.9450448636194
+    # After:
+    Processed 44691 lines in 56 ms
+    Expected seconds for 1 billion rows instead 1264.9479537267011
+    # Improvement: 119 / 56 = 2.1X
+    ```
+
