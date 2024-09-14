@@ -1,5 +1,5 @@
 use memory_stats::memory_stats;
-use rayon::{current_thread_index, prelude::*}; // current_thread_index,
+use rayon::{current_thread_index, prelude::*};
 use std::io::{BufWriter, Read, Seek, Write};
 use std::os::unix::fs::FileExt;
 use std::str::Lines;
@@ -42,23 +42,23 @@ pub fn generate_chunks(filename: &str) -> Result<Vec<(usize, usize)>, io::Error>
 
     let start_time = Instant::now();
 
-    let cpu_count: usize = 8; // Decides the number of chunks
+    let cpu_count: usize = std::thread::available_parallelism().unwrap().into(); // Decides the number of chunks
     let file_size = file.metadata()?.len() as usize;
     let chunk_size = file_size / cpu_count;
 
     let mut chunks: Vec<(usize, usize)> = vec![];
     let mut start = 0;
 
-    // let mut reader = BufReader::new(file);
-
     while start < file_size {
         let mut end = (start + chunk_size).min(file_size);
 
-        // Find newline (TODO: Possible to optimize reads by loading page from disk?)
+        // Find newline
         let mut last_seen_chars = [0; 1];
         while end > start && last_seen_chars[0] != b'\n' {
             end -= 1;
             file.read_exact_at(&mut last_seen_chars, end as u64)?;
+            // Note: we are reading each char at a time, but I believe OS would
+            // load a memory page from disk. So it won't be seeking disk for each char.
         }
 
         chunks.push((start, end));
@@ -125,6 +125,8 @@ pub fn process_data(input_filename: &str, output_filename: &str) -> Result<u32, 
     chunks.truncate(2); // To load all the data, you need 13G free RAM
     dbg!(&chunks);
 
+    let workers_time = Instant::now();
+
     let chunks_stat_maps: Vec<HashMap<String, Stats>> = chunks
         .par_iter()
         .map(|(start, end)| {
@@ -143,8 +145,14 @@ pub fn process_data(input_filename: &str, output_filename: &str) -> Result<u32, 
             // dbg!(current_thread_index().unwrap(), buffer.len());
 
             if let Some(usage) = memory_stats() {
-                println!("Current physical memory usage: {}MB", usage.physical_mem / 1024 / 1024);
-                println!("Current virtual memory usage: {}MB", usage.virtual_mem / 1024 / 1024);
+                println!(
+                    "Current physical memory usage: {}MB",
+                    usage.physical_mem / 1024 / 1024
+                );
+                println!(
+                    "Current virtual memory usage: {}MB",
+                    usage.virtual_mem / 1024 / 1024
+                );
             } else {
                 println!("Couldn't get the current memory usage :(");
             }
@@ -154,6 +162,8 @@ pub fn process_data(input_filename: &str, output_filename: &str) -> Result<u32, 
             chunk_stats_map
         })
         .collect();
+
+    println!("Time taken by workers {}s", workers_time.elapsed().as_secs());
 
     // pb.finish_with_message("Done");
 
