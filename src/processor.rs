@@ -1,6 +1,8 @@
 use rayon::{current_thread_index, prelude::*}; // current_thread_index,
 use std::io::{BufWriter, Read, Seek, Write};
+use std::os::unix::fs::FileExt;
 use std::str::Lines;
+use std::time::Instant;
 use std::{
     collections::HashMap,
     fs::File,
@@ -27,7 +29,18 @@ impl Stats {
     }
 }
 
-pub fn generate_chunks(file: File) -> Result<Vec<(usize, usize)>, io::Error> {
+pub fn generate_chunks(filename: &str) -> Result<Vec<(usize, usize)>, io::Error> {
+    let file = File::open(filename).unwrap_or_else(|_| {
+        let pwd = std::env::current_dir().expect("cannot get current directory");
+        panic!(
+            "cannot open input file {}. pwd: {}",
+            filename,
+            pwd.to_str().unwrap()
+        )
+    });
+
+    let start_time = Instant::now();
+
     let cpu_count: usize = 8; // Decides the number of chunks
     let file_size = file.metadata()?.len() as usize;
     let chunk_size = file_size / cpu_count;
@@ -35,33 +48,29 @@ pub fn generate_chunks(file: File) -> Result<Vec<(usize, usize)>, io::Error> {
     let mut chunks: Vec<(usize, usize)> = vec![];
     let mut start = 0;
 
-    let mut reader = BufReader::new(file);
-
-    dbg!("started generating chunks");
+    // let mut reader = BufReader::new(file);
 
     while start < file_size {
-        // Read bytes from the current start position till buffer size at max:
-        let mut buffer = vec![0; chunk_size];
-        reader.seek(io::SeekFrom::Start(start as u64))?;
-        let bytes_read = reader.read(&mut buffer[..])?; // bytes_read <= chunk_size
+        let mut end = (start + chunk_size).min(file_size);
 
-        // Find the position of the last newline in the buffer
-        let mut last_newline_in_buffer = bytes_read; // If no newline is found, use the entire buffer (FIXME: This can be troublesome if a huge line is inserted that exceeds chunk size?)
-        for i in (0..bytes_read).rev() {
-            if buffer[i] == b'\n' {
-                last_newline_in_buffer = i + 1;
-                break;
-            }
+        // Find newline (TODO: Possible to optimize reads by loading page from disk?)
+        let mut last_seen_chars = [0; 1];
+        while end > start && last_seen_chars[0] != b'\n' {
+            end -= 1;
+            file.read_exact_at(&mut last_seen_chars, end as u64)?;
         }
 
-        // Calculate end position:
-        let end = start + last_newline_in_buffer;
         chunks.push((start, end));
 
-        start = end;
+        // dbg!(end - start);
+
+        start = end + 1; // start from the the latest endpoint next time
     }
 
-    dbg!("done generating chunks"); // Looks like this takes a long time
+    println!(
+        "Time taken in generating chunks: {}μs",
+        start_time.elapsed().as_micros()
+    );
 
     Ok(chunks)
 }
@@ -111,21 +120,8 @@ fn process_chunk(lines: Lines, _num_lines: usize) -> HashMap<String, Stats> {
 }
 
 pub fn process_data(input_filename: &str, output_filename: &str) -> Result<u32, io::Error> {
-    let input_file = File::open(input_filename).unwrap_or_else(|_| {
-        let pwd = std::env::current_dir().expect("cannot get current directory");
-        panic!(
-            "cannot open input file {}. pwd: {}",
-            input_filename,
-            pwd.to_str().unwrap()
-        )
-    });
-
-    let chunks = generate_chunks(input_file).expect("cannot generate chunks");
-
+    let chunks = generate_chunks(input_filename).expect("cannot generate chunks");
     dbg!(&chunks);
-
-    let output_file = File::create(output_filename).expect("cannot create output file");
-    let mut writer = BufWriter::new(output_file);
 
     let chunks_stat_maps: Vec<HashMap<String, Stats>> = chunks
         .par_iter()
@@ -133,17 +129,22 @@ pub fn process_data(input_filename: &str, output_filename: &str) -> Result<u32, 
             let file = File::open(input_filename).unwrap();
             let mut reader = BufReader::new(file);
 
+            dbg!(current_thread_index(), *end - *start);
+
             reader.seek(io::SeekFrom::Start(*start as u64)).unwrap();
             let mut buffer = Vec::new();
             reader
                 .take((*end - *start) as u64)
                 .read_to_end(&mut buffer)
                 .unwrap();
-            let content = String::from_utf8_lossy(&buffer);
-            // let thread_id = current_thread_index();
-            // dbg!(thread_id, &content.len());
-            let chunk_stats_map = process_chunk(content.lines(), content.len());
-            chunk_stats_map
+
+            dbg!(buffer.len());
+
+            HashMap::new()
+
+            // let content = String::from_utf8_lossy(&buffer);
+            // let chunk_stats_map = process_chunk(content.lines(), content.len());
+            // chunk_stats_map
         })
         .collect();
 
@@ -160,18 +161,23 @@ pub fn process_data(input_filename: &str, output_filename: &str) -> Result<u32, 
         }
     }
 
-    for (station, stats) in final_stats_map.iter() {
-        // println!("{};{};{};{}", station, min, (sum / (count as f32)), max);
-        writer.write_all(
-            format!(
-                "{};{};{};{}\n",
-                station,
-                stats.min,
-                (stats.sum / (stats.count as f32)),
-                stats.max
-            )
-            .as_bytes(),
-        )?;
+    {
+        let output_file = File::create(output_filename).expect("cannot create output file");
+        let mut writer = BufWriter::new(output_file);
+
+        for (station, stats) in final_stats_map.iter() {
+            // println!("{};{};{};{}", station, min, (sum / (count as f32)), max);
+            writer.write_all(
+                format!(
+                    "{};{};{};{}\n",
+                    station,
+                    stats.min,
+                    (stats.sum / (stats.count as f32)),
+                    stats.max
+                )
+                .as_bytes(),
+            )?;
+        }
     }
 
     Ok(lines_processed)
