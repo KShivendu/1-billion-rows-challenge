@@ -67,3 +67,31 @@ perf report -g
     # Improvement: 119 / 56 = 2.1X
     ```
 
+* Use chunks with parallel rayon workers
+  ```bash
+
+    ➜  one_brc git:(master) ✗ ./target/release/one_brc measurements.txt                                                            1162ms
+    Time taken in generating chunks: 108μs
+    [src/processor.rs:126:5] &chunks = [
+        (
+            0,
+            1724479094,
+        ),
+        (
+            1724479095,
+            3448958200,
+        ),
+    ]
+    [src/processor.rs:143:13] current_thread_index().unwrap() = 0
+    [src/processor.rs:143:13] buffer.len() = 1724479094
+    Current physical memory usage: 3209MB
+    Current virtual memory usage: 5155MB
+    [src/processor.rs:143:13] current_thread_index().unwrap() = 2
+    [src/processor.rs:143:13] buffer.len() = 1724479105
+    Current physical memory usage: 3291MB
+    Current virtual memory usage: 5155MB
+    Processed 250M lines in 20451 ms
+    Expected seconds for 1 billion rows instead 81.8054588989169
+
+    # 1264/81=15X improvement!
+  ```

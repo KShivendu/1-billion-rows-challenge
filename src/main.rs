@@ -16,8 +16,8 @@ pub fn main() {
     let duration = start.elapsed();
 
     println!(
-        "Processed {} lines in {} ms",
-        lines_processed,
+        "Processed {}M lines in {} ms",
+        lines_processed / 1_000_000,
         duration.as_millis()
     );
 

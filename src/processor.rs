@@ -1,3 +1,4 @@
+use memory_stats::memory_stats;
 use rayon::{current_thread_index, prelude::*}; // current_thread_index,
 use std::io::{BufWriter, Read, Seek, Write};
 use std::os::unix::fs::FileExt;
@@ -120,7 +121,8 @@ fn process_chunk(lines: Lines, _num_lines: usize) -> HashMap<String, Stats> {
 }
 
 pub fn process_data(input_filename: &str, output_filename: &str) -> Result<u32, io::Error> {
-    let chunks = generate_chunks(input_filename).expect("cannot generate chunks");
+    let mut chunks = generate_chunks(input_filename).expect("cannot generate chunks");
+    chunks.truncate(2); // To load all the data, you need 13G free RAM
     dbg!(&chunks);
 
     let chunks_stat_maps: Vec<HashMap<String, Stats>> = chunks
@@ -129,7 +131,7 @@ pub fn process_data(input_filename: &str, output_filename: &str) -> Result<u32, 
             let file = File::open(input_filename).unwrap();
             let mut reader = BufReader::new(file);
 
-            dbg!(current_thread_index(), *end - *start);
+            // dbg!(*end - *start);
 
             reader.seek(io::SeekFrom::Start(*start as u64)).unwrap();
             let mut buffer = Vec::new();
@@ -138,15 +140,22 @@ pub fn process_data(input_filename: &str, output_filename: &str) -> Result<u32, 
                 .read_to_end(&mut buffer)
                 .unwrap();
 
-            dbg!(buffer.len());
+            // dbg!(current_thread_index().unwrap(), buffer.len());
 
-            HashMap::new()
+            if let Some(usage) = memory_stats() {
+                println!("Current physical memory usage: {}MB", usage.physical_mem / 1024 / 1024);
+                println!("Current virtual memory usage: {}MB", usage.virtual_mem / 1024 / 1024);
+            } else {
+                println!("Couldn't get the current memory usage :(");
+            }
 
-            // let content = String::from_utf8_lossy(&buffer);
-            // let chunk_stats_map = process_chunk(content.lines(), content.len());
-            // chunk_stats_map
+            let content = String::from_utf8_lossy(&buffer);
+            let chunk_stats_map = process_chunk(content.lines(), content.len());
+            chunk_stats_map
         })
         .collect();
+
+    // pb.finish_with_message("Done");
 
     let mut final_stats_map: HashMap<String, Stats> = HashMap::new();
     let mut lines_processed = 0;
